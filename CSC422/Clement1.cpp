@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NMAX 100
+#define NMAX 2187
 //If NMAX is not big enough, print an error message that explains that the user should increase NMAX and recompile.
 
 /*
@@ -78,7 +78,7 @@ int checkGraph(int N,
             }
             if(!found) {
                 sprintf(error_msg, "*** Error- adjacency matrix is not symmetric: "
-                               "A[ %d][ %d] = %d, A[ %d][ %d] = %d", i, j, 1, j, i, 0);
+                        "A[ %d][ %d] = %d, A[ %d][ %d] = %d", i, j, 1, j, i, 0);
                 ret = 0;
             }
         }
@@ -202,7 +202,7 @@ int getCertificate(int k,
         if((vertex >= N) || (vertex < 0))
         {
             sprintf(error_msg, "Error- Value %4d in the certificate is not in the range [0,%4d]",
-            vertex, N-1);
+                    vertex, N-1);
             ret = 0;
         }
         (*array)[i] = vertex;
@@ -355,21 +355,17 @@ int main(int argc, char *argv[])
 
     int size_of_graph;
     int graph_count = 1;
-
+    printf("1\n");
+    fflush(stdout);
     /* while there are integers to be read in from stdin, create the adj list and check the dominating set */
     while(getNextInt(&size_of_graph)) {
-
-        if (graph_count >= NMAX) {
-            printf("Error NMAX is set to %d. Please increase NMAX and re-compile\n", NMAX);
-            return 0;
-        }
 
         if (size_of_graph <= 0) {
             printf("Error: N = %d. Please set to an appropriate value\n", size_of_graph);
             return 0;
         }
 
-        int graph[NMAX][NMAX];
+        static int graph[NMAX][NMAX];
         int certificate[NMAX];
         char error_msg[255];
         int error_num;
