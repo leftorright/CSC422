@@ -1,4 +1,8 @@
 //
+// Clement.cpp
+// Finds a minimum dominating set of a graph.
+// TO RUN: ./a.out <verbosity>  <  <input file>  >  <output file>
+//
 // Created by Stephanie Clement on 2017-07-13.
 //
 
@@ -22,6 +26,7 @@ struct graph_s {
     int min_size;
     int min_dom[NMAX];
 };
+
 /* print_vector()
  *
  * prints the contents of an array
@@ -41,19 +46,25 @@ void print_vector(int size, int *dom) {
 }
 /*
  * get_next_int()
- * reads the next character from stdin
- * input: num - int ptr
+ * reads the next integer from stdin
+ * input:  num - int ptr
  * output: 1 if successfully read in an integer
  *         0 otherwise
  */
-int get_next_int(int *num)
+int get_next_int(int *num, int graph_num)
 {
     int ret = scanf("%d", num);
-    if (ret == 0 || ret == EOF)
-    {
-        return 0;
+    if (ret == 1) {
+        return 1;
     }
-    return 1;
+    else if (ret == EOF) {
+#if DEBUG
+        printf("Normal termination occurred. %d graphs read in\n", graph_num-1);
+#endif
+    } else {
+        printf("Error reading in graph %d\n", graph_num);
+    }
+    return 0;
 }
 /*
  * initialize_min_dom_set()
@@ -283,13 +294,13 @@ int get_adj_list(graph_s *G)
     for(int i = 0; i < G->n; i++) {
         int i_degree;
         int neighbour;
-        if (get_next_int(&i_degree) && i_degree <= DEG_MAX ) {
+        if (get_next_int(&i_degree, G->graph_num) && i_degree <= DEG_MAX ) {
             G->degree[i] = i_degree;
             if (i_degree > max_degree)
                 max_degree = i_degree;
             for (int j = 0; j < i_degree; j++)
             {
-                if(!get_next_int(&neighbour)) {
+                if(!get_next_int(&neighbour, G->graph_num)) {
                     printf("Error: graph:%d vertex:%d is missing neighbour in position:%d\n", G->graph_num, i, j);
                     exit(0);
                 }
@@ -349,7 +360,7 @@ void print_certificate(graph_s *G, int verbose)
  */
 int read_graph(graph_s *graph, int graph_num)
 {
-    if (get_next_int(&graph->n)) {
+    if (get_next_int(&graph->n, graph_num)) {
         graph->graph_num = graph_num;
         get_adj_list(graph);
         return 1;
