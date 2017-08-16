@@ -25,6 +25,16 @@ struct graph_s {
     int dom[NMAX];
     int min_size;
     int min_dom[NMAX];
+    int domination_number[NMAX];
+};
+struct node {
+    int vertex;
+    node *next;
+    node *prev;
+};
+struct list {
+    node *head;
+    node *tail;
 };
 
 /* print_vector()
@@ -71,16 +81,36 @@ int get_next_int(int *num, int graph_num)
  * initializes the data structures needed for determining a minimum dominating set of the input graph.
  * input: graph - graph_s ptr for storing graph/dominating set information
  */
-void initialize_min_dom_set(graph_s *graph)
+void initialize_min_dom_set(graph_s *graph, node **buckets)
 {
-    for (int i=0; i < graph->n; i++){
+    // initialize buckets
+    node *root = new node;
+    root->vertex = -1;
+    root->next = 0;
+    root->prev = 0;
+    for (int i = 0 ; i < DEG_MAX; i++) {
+        buckets[i] = root;
+    }
+
+    for (int i=0; i < graph->n; i++) {
         graph->num_choice[i] = graph->degree[i] + 1;
+        graph->domination_number[i] = graph->num_choice[i];
+        // update graph
         graph->num_dominated[i] = 0;
         graph->min_dom[i] = i;
+        // fill buckets
+        node *new_node = new node;
+        new_node->vertex = i;
+        new_node->next = buckets[graph->num_choice[i]];
+        new_node->prev = 0;
+        buckets[graph->num_choice[i]]->prev = new_node;
+        buckets[graph->num_choice[i]] = new_node;
     }
     graph->n_dominated = 0;
     graph->size = 0;
     graph->min_size = graph->n;
+
+
 }
 
 /* array_copy()
@@ -122,6 +152,7 @@ int color_blue(graph_s *G, int u)
     for (int i = 0; i < G->degree[u]; i++){
         int v = G->G[u][i];
         G->num_choice[v]--;
+        G->domination_number[v] = G->degree[v] + 1;
     }
     G->num_choice[u]--;
     return 1;
@@ -155,6 +186,7 @@ void inc_num_dominated(graph_s *G, int u)
     {
         int v = G->G[u][i];
         G->num_dominated[v]++;
+        G->domination_number[v] = 0;
     }
 }
 
@@ -226,13 +258,171 @@ void color_white(graph_s *G, int u)
         int v = G->G[u][i];
         if (G->num_dominated[v] == 0){
             G->n_dominated--;
+            G->domination_number[v] = G->degree[v] + 1;
         }
     }
     if (G->num_dominated[u] == 0) {
         G->n_dominated--;
+        G->domination_number[u] = G->degree[u] + 1;
     }
     // decrement size
     G->size--;
+}
+int find_largest_bucket(node **buckets)
+{
+    for (int i = DEG_MAX - 1 ; i >= 0; i--)
+    {
+        //check if it is -1 vertex
+        if (buckets[i]->vertex != -1) {
+            return i;
+        }
+    }
+    return -1;
+}
+int in_dominating_set(int v, graph_s *G)
+{
+    for (int i = 0; i < G->size; i++) {
+        if (G->dom[i] == v) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void insert_in_front(node **bucket, int i, int v)
+{
+    node *current_node = bucket[i];
+    node *new_node = new node;
+    new_node->vertex = v;
+    new_node->next = current_node;
+    new_node->prev = 0;
+    current_node->prev = new_node;
+    bucket[i] = new_node;
+}
+
+int get_max_dominator_value(graph_s *G, int v)
+{
+    int max = G->domination_number[v];
+    for (int i = 1; i < G->degree[v]; i++) {
+        if (G->domination_number[G->G[v][i]] > max) {
+            max = G->domination_number[G->G[v][i]];
+        }
+    }
+    return max;
+}
+
+void look_in_buckets(node **buckets, graph_s *G, int u)
+{
+    // remove nodes in buckets that are neighbours of u
+    for (int j = G->domination_number[u]; j < G->max_degree + 1; j++){
+        // check in list
+        node *current_node = buckets[j];
+        node *prev = 0;
+        while (current_node->next) {
+            // check if it is our vertex!
+            if (current_node->vertex == u) {
+
+                // remove node
+                current_node->next->prev = current_node->prev;
+                if (!prev) {
+                    buckets[j] = current_node->next;
+
+                } else {
+                    prev->next = current_node->next;
+
+                }
+
+                int max = get_max_dominator_value(G, u);
+                insert_in_front(buckets, max, u);
+                return;
+            }
+            prev = current_node;
+            current_node = current_node->next;
+        }
+    }
+}
+void remove_from_buckets(node **buckets, graph_s *G, int v) {
+    for (int i = G->domination_number[v]; i < G->max_degree; i++) {
+        node *current_node = buckets[i];
+        node *prev = 0;
+        while (current_node->next !=0 ) {
+            if (current_node->vertex == v) {
+                //remove node
+                current_node->next->prev = current_node->prev;
+                if (!prev) {
+                    buckets[i] = current_node->next;
+                } else {
+                    prev->next = current_node->next;
+                }
+                return;
+            }
+            prev = current_node;
+            current_node = current_node->next;
+        }
+    }
+}
+void update_buckets(node **buckets, int v, int bucket_index, graph_s *G)
+{
+    // decrement neighbours of v
+    //we know dominating number of neighbours of v are at least domination num
+    for (int i = 0; i < G->degree[v]; i++) {
+        int u = G->G[v][i];
+        if (G->domination_number[u] == 0) {
+            // don't need to update this
+            continue;
+        }
+        //remove_from_buckets(buckets, G, u);
+        /// XXX this should remove v from bucket not all neighbours
+    }
+}
+void reset_buckets(node **buckets, int v, int bucket_index, graph_s *G)
+{
+    for (int i = 0; i < G->degree[v]; i++) {
+        int u = G->G[v][i];
+        look_in_buckets(buckets, G, u);
+    }
+    look_in_buckets(buckets, G, v);
+}
+
+void min_dom_set_2(int level, graph_s *G, node **buckets)
+{
+#if DEBUG
+    printf("\n");
+    printf("Level %3d: \n", level);
+    printf("Dom set size:%d\n", G->size);
+    printf("Dom: ");
+    print_vector(G->size, G->dom);
+    printf("Number of vertices dominated: %3d\n",
+           G->n_dominated);
+    printf("Number of choices per vertex:\n");
+    print_vector(G->n, G->num_choice);
+    printf("Number of times dominated:\n");
+    print_vector(G->n, G->num_dominated);
+    fflush(stdout);
+#endif
+    if (G->n_dominated == G->n || level == G->n) {
+        if (G->size < G->min_size && G->n_dominated == G->n) {
+            array_copy(G->dom, G->min_dom, G->size);
+            G->min_size = G->size;
+        }
+        return;
+    }
+    int n_extra = (G->n - G->n_dominated + G->max_degree) / (G->max_degree + 1);
+    if ((G->size + n_extra) >= G->min_size)
+        return;
+
+    int bucket_index = find_largest_bucket(buckets);
+    int v = buckets[bucket_index]->vertex;
+    color_red(G, v);
+    update_buckets(buckets, v, bucket_index, G);
+    min_dom_set_2(level + 1, G, buckets);
+
+    color_blue(G, v);
+    min_dom_set_2(level + 1, G, buckets);
+
+    color_white(G, v);
+    reset_buckets(buckets, v, bucket_index, G);
+    return;
 }
 /*
  * min_dom_set()
@@ -267,7 +457,7 @@ void min_dom_set(int level, graph_s *G)
     if ((G->size + n_extra) >= G->min_size)
         return;
 
-    // color vertex blue if ret is 0 then it doesn't make sense to color it blue, so
+    // color vertex blue. if ret is 0 then it doesn't make sense to color it blue, so
     // skip to coloring vertex red
     int ret = color_blue(G, level);
     if (ret) {
@@ -304,7 +494,6 @@ int get_adj_list(graph_s *G)
                     printf("Error: graph:%d vertex:%d is missing neighbour in position:%d\n", G->graph_num, i, j);
                     exit(0);
                 }
-
                 G->G[i][j] = neighbour;
             }
         } else {
@@ -379,9 +568,10 @@ int main(int argc, char *argv[])
     }
     graph_s graph;
     int graph_num = 1;
+    node *buckets[DEG_MAX];
     while (read_graph(&graph, graph_num)) {
-        initialize_min_dom_set(&graph);
-        min_dom_set(0, &graph);
+        initialize_min_dom_set(&graph, buckets);
+        min_dom_set_2(0, &graph, buckets);
         print_certificate(&graph, verbose);
         graph_num++;
     }
